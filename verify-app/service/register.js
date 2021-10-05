@@ -1,50 +1,48 @@
-const AWS = require('aws-sdk')
+const AWS = require('aws-sdk');
 AWS.config.update({
-    region: "us-east-1"
+    region: 'us-east-1'
 })
-const util = require('../utils/util')
-const bcrypt = require('bcryptjs')
+const util = require('../utils/util');
+const bcrypt = require('bcryptjs');
 
-const dynamodb = new AWS.DynamoDB.DocumentClient()
-const userTable = 'jinmeister-users'
+const dynamodb = new AWS.DynamoDB.DocumentClient();
+const userTable = 'jinmeister-users';
 
-const register = async (userInfo) => {
-    const name = userInfo.name
-    const email = userInfo.email
-    const username = userInfo.username
-    const password = userInfo.password
+async function register(userInfo) {
+    const name = userInfo.name;
+    const email = userInfo.email;
+    const username = userInfo.username;
+    const password = userInfo.password;
     if (!username || !name || !email || !password) {
         return util.buildResponse(401, {
-            message: 'すべての項目が必須です'
+            message: 'All fields are required'
         })
     }
 
-    const dynamoUser = await getUser(username.toLowerCase().trim())
+    const dynamoUser = await getUser(username.toLowerCase().trim());
     if (dynamoUser && dynamoUser.username) {
         return util.buildResponse(401, {
-            message: 'ユーザー名は既に存在します。別のユーザー名を選択してください。'
+            message: 'username already exists in our database. please choose a different username'
         })
     }
 
-    const encryptPW = bcrypt.hashSync(password.trim(), 10)
+    const encryptedPW = bcrypt.hashSync(password.trim(), 10);
     const user = {
         name: name,
         email: email,
         username: username.toLowerCase().trim(),
-        password: encryptPW
+        password: encryptedPW
     }
 
-    const saveUserResponse = await saveUser(user)
+    const saveUserResponse = await saveUser(user);
     if (!saveUserResponse) {
-        return util.buildResponse(503, {
-            message: 'サーバーエラーが起きました。もう一度アクセスし直して下さい。'
-        })
+        return util.buildResponse(503, { message: 'Server Error. Please try again later.'});
     }
 
-    return util.buildResponse(200, { username: username })
+    return util.buildResponse(200, { username: username });
 }
 
-const getUser = async (username) => {
+async function getUser(username) {
     const params = {
         TableName: userTable,
         Key: {
@@ -53,22 +51,22 @@ const getUser = async (username) => {
     }
 
     return await dynamodb.get(params).promise().then(response => {
-        return response.Item
+        return response.Item;
     }, error => {
-        console.error("getUserでエラーが起きました", error)
+        console.error('There is an error getting user: ', error);
     })
 }
 
-const saveUser = async (user) => {
+async function saveUser(user) {
     const params = {
         TableName: userTable,
         Item: user
     }
     return await dynamodb.put(params).promise().then(() => {
-        return true
+        return true;
     }, error => {
-        console.error('saveUserでエラーが起きました', error)
-    })
+        console.error('There is an error saving user: ', error)
+    });
 }
 
-module.exports.register = register
+module.exports.register = register;

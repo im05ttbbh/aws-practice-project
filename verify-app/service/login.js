@@ -1,30 +1,30 @@
-const AWS = require('aws-sdk')
+const AWS = require('aws-sdk');
 AWS.config.update({
-    region: "us-east-1"
+    region: 'us-east-1'
 })
-const util = require('../utils/util')
-const bcrypt = require('bcryptjs')
+const util = require('../utils/util');
+const bcrypt = require('bcryptjs');
+const auth = require('../utils/auth');
 
-const dynamodb = new AWS.DynamoDB.DocumentClient()
-const userTable = 'jinmeister-users'
-const auth = require('../utils/auth')
+const dynamodb = new AWS.DynamoDB.DocumentClient();
+const userTable = 'jinmeister-users';
 
-const login = async (user) => {
-    const username = user.username
-    const password = user.password
+async function login(user) {
+    const username = user.username;
+    const password = user.password;
     if (!user || !username || !password) {
         return util.buildResponse(401, {
-            message: 'ユーザーネームとパスワードが必要です'
+            message: 'username and password are required'
         })
     }
 
-    const dynamoUser = await getUser(username.toLowerCase().trim())
+    const dynamoUser = await getUser(username.toLowerCase().trim());
     if (!dynamoUser || !dynamoUser.username) {
-        return util.buildResponse(403, { message: 'ユーザーが存在しません' })
+        return util.buildResponse(403, { message: 'user does not exist'});
     }
 
     if (!bcrypt.compareSync(password, dynamoUser.password)) {
-        return util.buildResponse(403, { message: 'パスワードが違います' })
+        return util.buildResponse(403, { message: 'password is incorrect'});
     }
 
     const userInfo = {
@@ -36,7 +36,22 @@ const login = async (user) => {
         user: userInfo,
         token: token
     }
-    return util.buildResponse(200, response)
+    return util.buildResponse(200, response);
 }
 
-module.exports.login = login
+async function getUser(username) {
+    const params = {
+        TableName: userTable,
+        Key: {
+            username: username
+        }
+    }
+
+    return await dynamodb.get(params).promise().then(response => {
+        return response.Item;
+    }, error => {
+        console.error('There is an error getting user: ', error);
+    })
+}
+
+module.exports.login = login;
